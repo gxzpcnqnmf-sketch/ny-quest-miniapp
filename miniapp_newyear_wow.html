@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>🎄 Новогодний квест</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root{
+      --bg1:#120a2a; --bg2:#3a1b4d; --glass: rgba(255,255,255,.10);
+      --glass2: rgba(255,255,255,.14); --stroke: rgba(255,255,255,.16);
+      --text: rgba(255,255,255,.92); --muted: rgba(255,255,255,.65);
+      --shadow: 0 20px 60px rgba(0,0,0,.45);
+      --radius: 28px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%; margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif; color:var(--text); background: #0b0618;}
+    body{
+      overflow:hidden;
+    }
+    /* Background */
+    .bg{
+      position:fixed; inset:0; z-index:0;
+      background:
+        radial-gradient(900px 500px at 15% 10%, rgba(255,210,246,.22), transparent 60%),
+        radial-gradient(700px 450px at 85% 25%, rgba(180,255,245,.18), transparent 65%),
+        radial-gradient(900px 700px at 40% 110%, rgba(255,255,255,.08), transparent 60%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+      filter:saturate(1.1);
+    }
+    .orb{
+      position:absolute; width:340px; height:340px; border-radius:50%;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.35), rgba(255,255,255,.05) 55%, transparent 70%);
+      filter: blur(1px);
+      opacity:.35;
+      animation: float 10s ease-in-out infinite;
+    }
+    .orb.o1{left:-80px; top:70px; animation-duration: 11s;}
+    .orb.o2{right:-110px; top:140px; width:420px; height:420px; opacity:.22; animation-duration: 13s;}
+    .orb.o3{left:30%; bottom:-180px; width:520px; height:520px; opacity:.18; animation-duration: 15s;}
+    @keyframes float{0%,100%{transform: translate3d(0,0,0)}50%{transform: translate3d(0,-18px,0)}}
+
+    canvas#snow{position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.9;}
+
+    /* Layout */
+    .wrap{
+      position:relative; z-index:2;
+      height:100%;
+      display:flex; flex-direction:column;
+      padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+      gap: 14px;
+    }
+    .topbar{
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+    }
+    .brand{
+      display:flex; flex-direction:column; gap:6px;
+    }
+    .brand .kicker{
+      font-size:12px; letter-spacing:.08em; text-transform:uppercase; color: var(--muted);
+      display:flex; align-items:center; gap:8px;
+    }
+    .brand .title{
+      font-size:20px; line-height:1.18; font-weight:800;
+      text-shadow: 0 10px 25px rgba(0,0,0,.35);
+    }
+    .pill{
+      padding:10px 12px; border-radius:999px;
+      background: rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.14);
+      display:flex; align-items:center; gap:10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      min-width: 126px;
+      justify-content:center;
+      user-select:none;
+    }
+    .pill .num{font-weight:800;}
+    .progress{
+      margin-top:8px;
+      height:10px; border-radius:999px;
+      background: rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.12);
+      overflow:hidden;
+    }
+    .progress > div{
+      height:100%;
+      width:0%;
+      background: linear-gradient(90deg, rgba(255,255,255,.55), rgba(255,255,255,.20));
+      border-radius:999px;
+      transition: width .5s ease;
+    }
+
+    /* Main card */
+    .card{
+      flex: 1;
+      background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
+      border: 1px solid rgba(255,255,255,.16);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+      padding: 18px 16px;
+      display:flex;
+      flex-direction:column;
+      gap: 14px;
+      position:relative;
+      overflow:hidden;
+      backdrop-filter: blur(12px);
+    }
+    .card:before{
+      content:"";
+      position:absolute; inset:-60px -40px auto auto;
+      width:220px; height:220px; border-radius:50%;
+      background: radial-gradient(circle at 35% 35%, rgba(255,255,255,.25), transparent 65%);
+      opacity:.25; filter: blur(2px);
+      transform: rotate(12deg);
+    }
+    .taskLabel{font-size:12px; color:var(--muted); display:flex; gap:8px; align-items:center}
+    .taskText{
+      font-size:18px;
+      line-height:1.35;
+      font-weight:750;
+      letter-spacing:-.01em;
+      white-space:pre-wrap;
+      min-height: 140px;
+      display:flex; align-items:center;
+    }
+    .note{
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .err{
+      margin-top:auto;
+      background: rgba(255,50,80,.14);
+      border:1px solid rgba(255,50,80,.22);
+      color: rgba(255,255,255,.90);
+      padding:10px 12px;
+      border-radius: 16px;
+      display:none;
+      white-space:pre-wrap;
+    }
+    .ok{
+      background: rgba(120,255,180,.12);
+      border:1px solid rgba(120,255,180,.22);
+      padding:10px 12px;
+      border-radius: 16px;
+      display:none;
+      white-space:pre-wrap;
+    }
+
+    /* Bottom */
+    .bottom{
+      display:flex; flex-direction:column; gap:10px;
+    }
+    .input{
+      background: rgba(0,0,0,.22);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 18px;
+      padding: 14px 14px;
+      color: var(--text);
+      outline:none;
+      font-size: 16px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.25);
+    }
+    .btnRow{
+      display:flex; gap:10px;
+    }
+    button{
+      border:0; border-radius: 18px;
+      padding: 14px 14px;
+      font-weight: 800;
+      font-size: 15px;
+      color: rgba(10,7,18,.95);
+      cursor:pointer;
+      flex:1;
+      transform: translateZ(0);
+      transition: transform .12s ease, filter .12s ease, opacity .12s ease;
+      user-select:none;
+    }
+    button:active{transform: scale(.98)}
+    .btnPrimary{
+      background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.68));
+      box-shadow: 0 18px 35px rgba(0,0,0,.28);
+    }
+    .btnGhost{
+      color: rgba(255,255,255,.92);
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: 0 18px 35px rgba(0,0,0,.18);
+    }
+    .btnSmall{
+      padding: 10px 12px;
+      font-size: 13px;
+      border-radius: 14px;
+    }
+    .disabled{opacity:.55; pointer-events:none; filter:grayscale(.2)}
+
+    /* Modal */
+    .modalBack{
+      position:fixed; inset:0; z-index:10;
+      background: rgba(0,0,0,.55);
+      display:none;
+      align-items:center; justify-content:center;
+      padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+    }
+    .modal{
+      width: min(520px, 100%);
+      border-radius: 28px;
+      background: linear-gradient(180deg, rgba(255,255,255,.13), rgba(255,255,255,.08));
+      border:1px solid rgba(255,255,255,.18);
+      box-shadow: 0 30px 80px rgba(0,0,0,.55);
+      overflow:hidden;
+      backdrop-filter: blur(14px);
+    }
+    .modalHead{
+      padding: 14px 16px;
+      display:flex; align-items:center; justify-content:space-between;
+      border-bottom:1px solid rgba(255,255,255,.14);
+    }
+    .modalHead b{font-size:15px}
+    .modalBody{padding: 14px 16px; display:flex; flex-direction:column; gap:10px}
+    .modalBody img{
+      width:100%; border-radius: 18px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.15);
+      max-height: 280px; object-fit: cover;
+    }
+    .modalBody .txt{white-space:pre-wrap; line-height:1.35}
+    .modalFoot{padding: 14px 16px; border-top:1px solid rgba(255,255,255,.14)}
+    .modalFoot button{width:100%}
+
+    /* Tiny */
+    .tiny{
+      font-size:12px; color: rgba(255,255,255,.55);
+      text-align:center;
+    }
+    .sparkle{
+      display:inline-block; animation: sparkle 1.8s ease-in-out infinite;
+      transform-origin:center;
+    }
+    @keyframes sparkle{0%,100%{transform: rotate(0) scale(1)}50%{transform: rotate(6deg) scale(1.08)}}
+  </style>
+</head>
+<body>
+  <div class="bg">
+    <div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+  </div>
+  <canvas id="snow"></canvas>
+
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="kicker"><span class="sparkle">🎄</span> 5 шагов → подсказки → финал 🎁</div>
+        <div class="title" id="title">Новогодний квест для любимой Катерины</div>
+      </div>
+      <div class="pill" title="Прогресс">
+        <span>Шаг</span>
+        <span class="num" id="stepNow">…</span>
+        <span>из</span>
+        <span class="num" id="totalSteps">5</span>
+      </div>
+    </div>
+
+    <div class="progress" aria-label="progress"><div id="bar"></div></div>
+
+    <div class="card">
+      <div class="taskLabel" id="taskLabel">✨ Задание</div>
+      <div class="taskText" id="taskText">Загружаю…</div>
+      <div class="note" id="hintBox" style="display:none;"></div>
+
+      <div class="ok" id="okBox"></div>
+      <div class="err" id="errBox"></div>
+
+      <div class="bottom">
+        <input class="input" id="answer" placeholder="Введи ответ / код…" autocomplete="off" />
+        <div class="btnRow">
+          <button class="btnPrimary" id="btnSend">Отправить ✅</button>
+          <button class="btnGhost" id="btnHint">Подсказка 💡</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tiny" id="tiny">Если видишь «Открой внутри Telegram» — запускай миниапп из бота 🙂</div>
+  </div>
+
+  <div class="modalBack" id="modalBack">
+    <div class="modal">
+      <div class="modalHead">
+        <b id="modalTitle">Открытка ✨</b>
+        <button class="btnGhost btnSmall" id="modalClose" style="flex:0;">Закрыть</button>
+      </div>
+      <div class="modalBody">
+        <img id="modalImg" alt="" style="display:none;" />
+        <div class="txt" id="modalTxt"></div>
+      </div>
+      <div class="modalFoot">
+        <button class="btnPrimary" id="modalOk">Дальше 🎁</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const API = "https://n8n-production-9c7d.up.railway.app/webhook";
+  const TOTAL_FALLBACK = 5;
+
+  const el = (id)=>document.getElementById(id);
+  const titleEl = el('title');
+  const stepNowEl = el('stepNow');
+  const totalEl = el('totalSteps');
+  const barEl = el('bar');
+  const taskLabelEl = el('taskLabel');
+  const taskTextEl = el('taskText');
+  const hintBox = el('hintBox');
+  const errBox = el('errBox');
+  const okBox = el('okBox');
+  const answerEl = el('answer');
+  const btnSend = el('btnSend');
+  const btnHint = el('btnHint');
+  const tiny = el('tiny');
+
+  const modalBack = el('modalBack');
+  const modalTitle = el('modalTitle');
+  const modalImg = el('modalImg');
+  const modalTxt = el('modalTxt');
+  const modalClose = el('modalClose');
+  const modalOk = el('modalOk');
+
+  // Telegram WebApp init
+  let tg = null;
+  try { tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null; } catch(e){}
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch(e){}
+  }
+
+  const initData = (tg && tg.initData) ? tg.initData : "";
+  const qp = new URLSearchParams(location.search);
+  const debugInit = qp.get('tma') || qp.get('initData') || "";
+  const TMA = initData || debugInit;
+
+  function setErr(msg){
+    errBox.style.display = msg ? 'block' : 'none';
+    errBox.textContent = msg || "";
+  }
+  function setOk(msg){
+    okBox.style.display = msg ? 'block' : 'none';
+    okBox.textContent = msg || "";
+  }
+
+  function setLoading(isLoading){
+    if (isLoading) {
+      btnSend.classList.add('disabled');
+      btnHint.classList.add('disabled');
+      btnSend.textContent = "Загружаю…";
+    } else {
+      btnSend.classList.remove('disabled');
+      btnHint.classList.remove('disabled');
+      btnSend.textContent = "Отправить ✅";
+    }
+  }
+
+  function progress(stepDone, totalSteps){
+    const total = totalSteps || TOTAL_FALLBACK;
+    const done = Math.max(0, Math.min(total, stepDone || 0));
+    const now = Math.min(done + 1, total);
+    stepNowEl.textContent = String(now);
+    totalEl.textContent = String(total);
+    barEl.style.width = String((done/total)*100) + "%";
+  }
+
+  function openModal({title="Открытка ✨", text="", imgUrl=""}){
+    modalTitle.textContent = title;
+    modalTxt.textContent = text || "";
+    if (imgUrl) {
+      modalImg.src = imgUrl;
+      modalImg.style.display = 'block';
+    } else {
+      modalImg.style.display = 'none';
+    }
+    modalBack.style.display = 'flex';
+    if (tg) { try { tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success'); } catch(e){} }
+  }
+  function closeModal(){
+    modalBack.style.display = 'none';
+  }
+  modalClose.onclick = closeModal;
+  modalOk.onclick = closeModal;
+  modalBack.addEventListener('click', (e)=>{ if(e.target===modalBack) closeModal(); });
+
+  function typewriter(text){
+    taskTextEl.textContent = "";
+    const t = String(text||"").trim();
+    if (!t) { taskTextEl.textContent = "…"; return; }
+    let i=0;
+    const speed = 10; // ms
+    const timer = setInterval(()=>{
+      taskTextEl.textContent += t[i] || "";
+      i++;
+      if (i>=t.length) clearInterval(timer);
+    }, speed);
+  }
+
+  async function apiState(){
+    setErr("");
+    setOk("");
+    hintBox.style.display = 'none';
+    if (!TMA) {
+      progress(0, TOTAL_FALLBACK);
+      typewriter("Открой этот квест внутри Telegram (через бота) ✨");
+      btnSend.classList.add('disabled');
+      btnHint.classList.add('disabled');
+      return;
+    }
+    setLoading(true);
+    try{
+      const url = API + "/quest/state?tma=" + encodeURIComponent(TMA);
+      const r = await fetch(url, { method: "GET" });
+      const txt = await r.text();
+      let j = null;
+      try { j = JSON.parse(txt); } catch(e){ j = { ok:false, error:"Пустой/не-JSON ответ от n8n", raw: txt.slice(0,200) }; }
+      if (!j || !j.ok) {
+        progress(0, j?.totalSteps || TOTAL_FALLBACK);
+        typewriter(j?.error || "Не удалось загрузить квест");
+        setErr(j?.error || "Ошибка");
+        setLoading(false);
+        return;
+      }
+      titleEl.textContent = j.title || "Новогодний квест для любимой Катерины";
+      progress(j.stepDone || 0, j.totalSteps || TOTAL_FALLBACK);
+
+      if (j.done) {
+        taskLabelEl.textContent = "🎁 Финал";
+        typewriter(j.final?.text || "Финал открыт!");
+        btnSend.classList.add('disabled');
+        btnHint.classList.add('disabled');
+      } else {
+        taskLabelEl.textContent = "✨ Задание " + (j.task?.step || (j.stepNow||1));
+        typewriter(j.task?.text || "Задание не задано");
+        btnSend.classList.remove('disabled');
+        btnHint.classList.remove('disabled');
+      }
+
+      // Hint available
+      if (j.hint) {
+        hintBox.textContent = "💡 Подсказка: " + j.hint;
+      }
+
+      // Show last card once (if user returned)
+      if (j.lastCard && (j.lastCard.cardText || j.lastCard.cardPhotoUrl)) {
+        const key = "shownCardStep";
+        const shown = Number(localStorage.getItem(key) || "0");
+        if (shown < (j.lastCard.step || 0)) {
+          localStorage.setItem(key, String(j.lastCard.step || 0));
+          openModal({
+            title: "Открытка за шаг " + (j.lastCard.step || ""),
+            text: j.lastCard.cardText || "",
+            imgUrl: j.lastCard.popPhotoUrl || j.lastCard.cardPhotoUrl || ""
+          });
+        }
+      }
+
+      setLoading(false);
+    }catch(e){
+      setLoading(false);
+      progress(0, TOTAL_FALLBACK);
+      typewriter("Не могу достучаться до сервера квеста 😕");
+      setErr("Сеть/сервер: " + (e?.message || e));
+    }
+  }
+
+  async function apiSubmit(){
+    setErr(""); setOk("");
+    const ans = (answerEl.value || "").trim();
+    if (!ans) { setErr("Введи ответ/код 🙂"); return; }
+    if (!TMA) { setErr("Открой миниапп внутри Telegram 🙂"); return; }
+    btnSend.classList.add('disabled');
+    btnSend.textContent = "Проверяю…";
+    try{
+      const url = API + "/quest/submit?tma=" + encodeURIComponent(TMA);
+      const body = new URLSearchParams({ answer: ans }); // no CORS preflight
+      const r = await fetch(url, { method: "POST", body });
+      const txt = await r.text();
+      let j = null;
+      try { j = JSON.parse(txt); } catch(e){ j = { ok:false, error:"Пустой/не-JSON ответ", raw: txt.slice(0,200) }; }
+
+      if (!j || !j.ok) {
+        setErr(j?.error || "Ошибка");
+        btnSend.classList.remove('disabled');
+        btnSend.textContent = "Отправить ✅";
+        return;
+      }
+
+      if (j.correct === false) {
+        setErr(j.message || "Неверно 🙈");
+        if (tg) { try { tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('error'); } catch(e){} }
+        btnSend.classList.remove('disabled');
+        btnSend.textContent = "Отправить ✅";
+        return;
+      }
+
+      // correct
+      setOk(j.message || "Верно!");
+      answerEl.value = "";
+
+      // show unlocked card
+      if (j.unlocked && (j.unlocked.cardText || j.unlocked.cardPhotoUrl || j.unlocked.popPhotoUrl)) {
+        openModal({
+          title: "Открытка ✨",
+          text: j.unlocked.cardText || "",
+          imgUrl: j.unlocked.popPhotoUrl || j.unlocked.cardPhotoUrl || ""
+        });
+      }
+
+      // update UI
+      progress(j.stepDone || 0, j.totalSteps || TOTAL_FALLBACK);
+      if (j.final?.text) {
+        taskLabelEl.textContent = "🎁 Финал";
+        typewriter(j.final.text);
+        btnSend.classList.add('disabled');
+        btnHint.classList.add('disabled');
+      } else if (j.nextTask?.text) {
+        taskLabelEl.textContent = "✨ Задание " + (j.nextTask.step || "");
+        typewriter(j.nextTask.text);
+        btnSend.classList.remove('disabled');
+        btnHint.classList.remove('disabled');
+      }
+
+      btnSend.textContent = "Отправить ✅";
+      btnSend.classList.remove('disabled');
+    }catch(e){
+      setErr("Сеть/сервер: " + (e?.message || e));
+      btnSend.textContent = "Отправить ✅";
+      btnSend.classList.remove('disabled');
+    }
+  }
+
+  btnSend.onclick = apiSubmit;
+  answerEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter') apiSubmit(); });
+
+  btnHint.onclick = ()=>{
+    // Toggle hint
+    if (hintBox.textContent) {
+      const shown = hintBox.style.display === 'block';
+      hintBox.style.display = shown ? 'none' : 'block';
+      if (!shown && tg) { try { tg.HapticFeedback && tg.HapticFeedback.selectionChanged(); } catch(e){} }
+    } else {
+      setErr("Подсказка пока не задана админом 🙈");
+    }
+  };
+
+  // Friendly footer
+  tiny.textContent = tg ? "Удачи, Катя ✨ Если что — подсказка кнопкой 💡" : "Открой миниапп из Telegram-бота 🙂";
+
+  // Snow effect
+  const canvas = document.getElementById('snow');
+  const ctx = canvas.getContext('2d');
+  let W=0,H=0,flakes=[];
+  function resize(){
+    W = canvas.width = window.innerWidth * (window.devicePixelRatio||1);
+    H = canvas.height = window.innerHeight * (window.devicePixelRatio||1);
+    canvas.style.width = window.innerWidth+'px';
+    canvas.style.height = window.innerHeight+'px';
+    const n = Math.min(160, Math.floor(window.innerWidth/4));
+    flakes = Array.from({length:n}, ()=>({
+      x: Math.random()*W,
+      y: Math.random()*H,
+      r: (Math.random()*2.2+0.6)*(window.devicePixelRatio||1),
+      s: (Math.random()*0.8+0.3)*(window.devicePixelRatio||1),
+      w: (Math.random()*0.6-0.3)*(window.devicePixelRatio||1),
+      o: Math.random()*0.6+0.2
+    }));
+  }
+  function tick(){
+    ctx.clearRect(0,0,W,H);
+    for(const f of flakes){
+      f.y += f.s;
+      f.x += f.w + Math.sin((f.y/120))*0.3;
+      if (f.y > H+10) { f.y = -10; f.x = Math.random()*W; }
+      if (f.x > W+10) f.x = -10;
+      if (f.x < -10) f.x = W+10;
+      ctx.globalAlpha = f.o;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, f.r, 0, Math.PI*2);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(tick);
+  }
+  window.addEventListener('resize', resize);
+  resize(); tick();
+
+  // Start
+  apiState();
+})();
+</script>
+</body>
+</html>
